@@ -18,11 +18,37 @@
     android:layout_height="wrap_content"
     android:layout_alignParentBottom="true" />
 
+  <LinearLayout
+    android:id="@+id/button_bar"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_above="@id/status_bar"
+    android:orientation="horizontal"
+    android:gravity="center">
+
+    <Button
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="Restart"
+      android:textAllCaps="true"
+      android:onClick="newGame"/>
+
+    <Button
+      android:layout_width="0dp"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+      android:text="Shuffle"
+      android:textAllCaps="true"
+      android:onClick="shuffleCards"/>
+
+  </LinearLayout>
+
   <View
     android:id="@+id/bottom_separator"
     android:layout_width="fill_parent"
     android:layout_height="1sp"
-    android:layout_above="@id/status_bar"
+    android:layout_above="@id/button_bar"
     android:background="#33B5E5" />
 
   <ViewAnimator

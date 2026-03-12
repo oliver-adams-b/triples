@@ -61,6 +61,11 @@ public class ClassicGameActivity extends BaseGameActivity
   }
 
   @Override
+  protected void deleteCurrentGame() {
+    mApplication.deleteClassicGame(mGame);
+  }
+
+  @Override
   protected void onDestroy() {
     mGame.removeOnUpdateCardsInPlayListener(this);
     mGame.removeOnTimerTickListener(this);
@@ -75,10 +80,9 @@ public class ClassicGameActivity extends BaseGameActivity
 
   @Override
   public void onUpdateCardsInPlay(
-      ImmutableList<Card> newCards,
-      ImmutableList<Card> oldCards,
-      int numRemaining,
+      ImmutableList<Card> newCards, ImmutableList<Card> oldCards, int numRemaining,
       int numTriplesFound) {
+    super.onUpdateCardsInPlay(newCards, oldCards, numRemaining, numTriplesFound);
     TextView numRemainingText = (TextView) findViewById(R.id.cards_remaining_text);
     numRemainingText.setText(String.valueOf(numRemaining));
   }

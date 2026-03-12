@@ -10,6 +10,7 @@ import com.google.common.collect.Sets;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -402,6 +403,15 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
   }
 
   public abstract String getGameTypeForAnalytics();
+
+  public void shuffleCardsInPlay() {
+    if (mGameState != GameState.ACTIVE) return;
+    ImmutableList<Card> oldCards = ImmutableList.copyOf(mCardsInPlay);
+    mHintedCards.clear();
+    mGameRenderer.clearHintedCards();
+    Collections.shuffle(mCardsInPlay);
+    dispatchCardsInPlayUpdate(oldCards);
+  }
 
   public boolean addHint() {
     if (mHintedCards.size() == 3) {

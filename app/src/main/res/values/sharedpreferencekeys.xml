@@ -6,5 +6,7 @@
   <string name="pref_screen_lock">pref_screen_lock</string>
   <string name="pref_fast_animations">pref_fast_animations</string>
   <string name="pref_animation_speed">pref_animation_speed</string>
+  <string name="pref_auto_restart_enabled">pref_auto_restart_enabled</string>
+  <string name="pref_auto_restart_timeout">pref_auto_restart_timeout</string>
 
 </resources>

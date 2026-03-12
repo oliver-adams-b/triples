@@ -61,6 +61,11 @@ public class ArcadeGameActivity extends BaseGameActivity
   }
 
   @Override
+  protected void deleteCurrentGame() {
+    mApplication.deleteArcadeGame(mGame);
+  }
+
+  @Override
   protected void onDestroy() {
     mGame.removeOnUpdateCardsInPlayListener(this);
     mGame.removeOnTimerTickListener(this);
@@ -81,6 +86,7 @@ public class ArcadeGameActivity extends BaseGameActivity
       ImmutableList<Card> oldCards,
       int numRemaining,
       int numTriplesFound) {
+    super.onUpdateCardsInPlay(newCards, oldCards, numRemaining, numTriplesFound);
     TextView triplesFound = (TextView) findViewById(R.id.triples_found_text);
     triplesFound.setText(String.valueOf(numTriplesFound));
   }
