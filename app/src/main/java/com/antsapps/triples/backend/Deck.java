@@ -1,12 +1,11 @@
 package com.antsapps.triples.backend;
 
 import com.google.common.collect.Lists;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-class Deck {
+public class Deck {
 
   List<Card> mCards;
 
@@ -69,5 +68,22 @@ class Deck {
     for (Card card : cards) {
       mCards.add(card);
     }
+  }
+
+  public void shuffle(Random random) {
+    Collections.shuffle(mCards, random);
+  }
+
+  public static Deck createBeginnerDeck(Random random) {
+    List<Card> cards = Lists.newArrayList();
+    for (int number = 0; number < Card.MAX_VARIABLES; number++) {
+      for (int shape = 0; shape < Card.MAX_VARIABLES; shape++) {
+        for (int color = 0; color < Card.MAX_VARIABLES; color++) {
+          cards.add(new Card(number, shape, 0, color));
+        }
+      }
+    }
+    Collections.shuffle(cards, random);
+    return new Deck(cards);
   }
 }

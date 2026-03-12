@@ -2,32 +2,34 @@ package com.antsapps.triples;
 
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
+import android.util.Log;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
-import android.util.Log;
-import android.widget.Toast;
-
-import com.google.android.gms.auth.api.Auth;
+import androidx.appcompat.app.AppCompatDelegate;
+import androidx.appcompat.widget.Toolbar;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.preference.PreferenceManager;
+import com.antsapps.triples.backend.Application;
+import com.antsapps.triples.backend.OnStateChangedListener;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.auth.api.signin.GoogleSignInResult;
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
-import com.google.android.gms.common.api.OptionalPendingResult;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.common.api.Status;
-import com.google.android.gms.games.Games;
-import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.games.PlayGames;
+import com.google.android.gms.games.PlayGamesSdk;
 import com.google.android.gms.tasks.Task;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.google.firebase.auth.AuthCredential;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.auth.GoogleAuthProvider;
 
-public abstract class BaseTriplesActivity extends AppCompatActivity
-    implements GoogleApiClient.OnConnectionFailedListener, GoogleApiClient.ConnectionCallbacks {
+public abstract class BaseTriplesActivity extends AppCompatActivity {
 
   public interface OnSignInListener {
     void onSignInStateChanged(boolean signedInAndConnected);
@@ -36,92 +38,149 @@ public abstract class BaseTriplesActivity extends AppCompatActivity
   private static final String TAG = "SignInActivity";
   private static final int RC_SIGN_IN = 9001;
 
+  protected FirebaseAnalytics mFirebaseAnalytics;
   private FirebaseAuth mFirebaseAuth;
-  protected GoogleApiClient mGoogleApiClient;
-  protected GoogleSignInAccount mGoogleSignInAccount;
+  protected boolean mIsSignedIn = false;
+  private boolean mIsSyncing = false;
+  private OnStateChangedListener mOnStateChangedListener;
 
   @Nullable private OnSignInListener mSignInListener;
 
   @Override
   protected void onCreate(@Nullable Bundle savedInstanceState) {
+    applyTheme();
     super.onCreate(savedInstanceState);
-
-    // Configure sign-in to request the user's ID, email address, and basic
-    // profile. ID and basic profile are included in DEFAULT_SIGN_IN.
-    GoogleSignInOptions gso =
-        new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_GAMES_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .build();
-
-    // Build a GoogleApiClient with access to the Google Sign-In API and the
-    // options specified by gso.
-    mGoogleApiClient =
-        new GoogleApiClient.Builder(this)
-            .enableAutoManage(this /* FragmentActivity */, this /* OnConnectionFailedListener */)
-            .addApi(Auth.GOOGLE_SIGN_IN_API, gso)
-            .addApi(Games.API)
-            .addConnectionCallbacks(this)
-            .build();
+    PlayGamesSdk.initialize(this);
 
     mFirebaseAuth = FirebaseAuth.getInstance();
+    mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
   }
 
   @Override
-  public void onStart() {
-    super.onStart();
+  public void setContentView(int layoutResID) {
+    super.setContentView(layoutResID);
+    setupToolbar();
+  }
 
-    OptionalPendingResult<GoogleSignInResult> opr =
-        Auth.GoogleSignInApi.silentSignIn(mGoogleApiClient);
-    if (opr.isDone()) {
-      // If the user's cached credentials are valid, the OptionalPendingResult will be "done"
-      // and the GoogleSignInResult will be available instantly.
-      Log.d(TAG, "Got cached sign-in. isConnected: " + mGoogleApiClient.isConnected());
-      GoogleSignInResult result = opr.get();
-      handleSignInResult(result);
-    } else {
-      // If the user has not previously signed in on this device or the sign-in has expired,
-      // this asynchronous branch will attempt to sign in the user silently.  Cross-device
-      // single sign-on will occur in this branch.
-      opr.setResultCallback(
-          new ResultCallback<GoogleSignInResult>() {
-            @Override
-            public void onResult(GoogleSignInResult googleSignInResult) {
-              handleSignInResult(googleSignInResult);
-            }
+  private void setupToolbar() {
+    Toolbar toolbar = findViewById(R.id.toolbar);
+    if (toolbar != null) {
+      setSupportActionBar(toolbar);
+    }
+
+    View appBarLayout = findViewById(R.id.app_bar_layout);
+    if (appBarLayout != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(
+          appBarLayout,
+          (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0);
+            return insets;
+          });
+    }
+
+    View bottomInsetContainer = findViewById(R.id.bottom_inset_container);
+    if (bottomInsetContainer != null) {
+      ViewCompat.setOnApplyWindowInsetsListener(
+          bottomInsetContainer,
+          (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(0, 0, 0, systemBars.bottom);
+            return insets;
           });
     }
   }
 
   @Override
+  public boolean onOptionsItemSelected(MenuItem item) {
+    if (item.getItemId() == android.R.id.home) {
+      onBackPressed();
+      return true;
+    }
+    return super.onOptionsItemSelected(item);
+  }
+
+  private void applyTheme() {
+    String theme =
+        PreferenceManager.getDefaultSharedPreferences(this)
+            .getString(getString(R.string.pref_theme), "system");
+    switch (theme) {
+      case "light":
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO);
+        break;
+      case "dark":
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES);
+        break;
+      case "system":
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
+        break;
+    }
+  }
+
+  @Override
+  public void onStart() {
+    super.onStart();
+  }
+
+  @Override
   protected void onResume() {
     super.onResume();
+    signInSilently();
+  }
+
+  private void signInSilently() {
+    PlayGames.getGamesSignInClient(this)
+        .isAuthenticated()
+        .addOnCompleteListener(
+            task -> {
+              boolean isAuthenticated = (task.isSuccessful() && task.getResult().isAuthenticated());
+              if (isAuthenticated) {
+                Log.d(TAG, "signInSilently: success");
+                mIsSignedIn = true;
+                mFirebaseAnalytics.logEvent(AnalyticsConstants.Event.SIGN_IN, null);
+                onSignInSucceeded();
+                // We still want to sign into Firebase if possible.
+                // PGS v2 doesn't give us the ID token directly for Firebase.
+                // For now, we prioritize PGS v2 migration.
+                fetchTokenAndSignInToFirebase();
+              } else {
+                Log.d(TAG, "signInSilently: failure");
+                mIsSignedIn = false;
+                onSignInFailed();
+              }
+            });
+  }
+
+  private void fetchTokenAndSignInToFirebase() {
+    GoogleSignInOptions gso =
+        new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_GAMES_SIGN_IN)
+            .requestEmail()
+            .requestProfile()
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .build();
+    GoogleSignInClient googleSignInClient = GoogleSignIn.getClient(this, gso);
+    googleSignInClient
+        .silentSignIn()
+        .addOnCompleteListener(
+            this,
+            task -> {
+              if (task.isSuccessful()) {
+                GoogleSignInAccount account = task.getResult();
+                firebaseAuthWithGoogle(account);
+              }
+            });
   }
 
   @Override
   public void onActivityResult(int requestCode, int resultCode, Intent data) {
     super.onActivityResult(requestCode, resultCode, data);
 
-    // Result returned from launching the Intent from GoogleSignInApi.getSignInIntent(...);
     if (requestCode == RC_SIGN_IN) {
-      GoogleSignInResult result = Auth.GoogleSignInApi.getSignInResultFromIntent(data);
-      Log.d(TAG, "onActivityResult. isConnected: " + mGoogleApiClient.isConnected());
-      handleSignInResult(result);
-    }
-  }
-
-  private void handleSignInResult(GoogleSignInResult result) {
-    Log.d(
-        TAG,
-        "handleSignInResult:"
-            + result.isSuccess()
-            + " isConnected: "
-            + mGoogleApiClient.isConnected());
-    if (result.isSuccess()) {
-      mGoogleSignInAccount = result.getSignInAccount();
-      firebaseAuthWithGoogle(mGoogleSignInAccount);
-      onSignInSucceeded();
-    } else {
-      onSignInFailed();
+      Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(data);
+      if (task.isSuccessful()) {
+        firebaseAuthWithGoogle(task.getResult());
+        signInSilently();
+      }
     }
   }
 
@@ -133,20 +192,18 @@ public abstract class BaseTriplesActivity extends AppCompatActivity
         .signInWithCredential(credential)
         .addOnCompleteListener(
             this,
-            new OnCompleteListener<AuthResult>() {
-              @Override
-              public void onComplete(@NonNull Task<AuthResult> task) {
-                if (task.isSuccessful()) {
-                  // Sign in success, update UI with the signed-in user's information
-                  Log.d(TAG, "signInWithCredential:success");
-                  FirebaseUser user = mFirebaseAuth.getCurrentUser();
-                } else {
-                  // If sign in fails, display a message to the user.
-                  Log.w(TAG, "signInWithCredential:failure", task.getException());
-                  Toast.makeText(
-                          BaseTriplesActivity.this, "Authentication failed.", Toast.LENGTH_SHORT)
-                      .show();
-                }
+            task -> {
+              if (task.isSuccessful()) {
+                // Sign in success, update UI with the signed-in user's information
+                Log.d(TAG, "signInWithCredential:success");
+                FirebaseUser user = mFirebaseAuth.getCurrentUser();
+                onSignInSucceeded();
+              } else {
+                // If sign in fails, display a message to the user.
+                Log.w(TAG, "signInWithCredential:failure", task.getException());
+                Toast.makeText(
+                        BaseTriplesActivity.this, "Authentication failed.", Toast.LENGTH_SHORT)
+                    .show();
               }
             });
   }
@@ -165,30 +222,72 @@ public abstract class BaseTriplesActivity extends AppCompatActivity
     if (mSignInListener != null) {
       mSignInListener.onSignInStateChanged(isSignedIn());
     }
+    Application application = Application.getInstance(this);
+    AchievementManager.syncAchievements(this, application);
+
+    if (!mIsSyncing) {
+      mIsSyncing = true;
+      CloudSaveManager.syncAll(this, application)
+          .addOnCompleteListener(
+              t -> {
+                mIsSyncing = false;
+              });
+    }
+
+    if (mOnStateChangedListener == null) {
+      mOnStateChangedListener =
+          new OnStateChangedListener() {
+            @Override
+            public void onStateChanged() {
+              if (isSignedIn() && !mIsSyncing) {
+                CloudSaveManager.saveAll(BaseTriplesActivity.this, application);
+              }
+            }
+          };
+      application.addOnStateChangedListener(mOnStateChangedListener);
+    }
   }
 
   public void signIn() {
-    Intent signInIntent = Auth.GoogleSignInApi.getSignInIntent(mGoogleApiClient);
-    startActivityForResult(signInIntent, RC_SIGN_IN);
+    PlayGames.getGamesSignInClient(this)
+        .signIn()
+        .addOnCompleteListener(
+            task -> {
+              if (task.isSuccessful() && task.getResult().isAuthenticated()) {
+                mIsSignedIn = true;
+                onSignInSucceeded();
+              } else {
+                mIsSignedIn = false;
+                onSignInFailed();
+              }
+            });
   }
 
   public boolean isSignedIn() {
-    return mGoogleApiClient != null
-        && mGoogleApiClient.isConnected()
-        && mGoogleApiClient.hasConnectedApi(Games.API);
+    return mIsSignedIn || mFirebaseAuth.getCurrentUser() != null;
   }
 
   protected void signOut() {
+    // Note: PGS v2 does not support programmatic sign out.
+    // We can sign out from Firebase.
     mFirebaseAuth.signOut();
-    Games.signOut(mGoogleApiClient);
-    Auth.GoogleSignInApi.signOut(mGoogleApiClient)
-        .setResultCallback(
-            new ResultCallback<Status>() {
-              @Override
-              public void onResult(Status status) {
-                onSignOut();
-              }
-            });
+    mFirebaseAnalytics.logEvent(AnalyticsConstants.Event.SIGN_OUT, null);
+    mIsSignedIn = false;
+    onSignOut();
+  }
+
+  @Nullable
+  public String getSignedInUserInfo() {
+    FirebaseUser user = mFirebaseAuth.getCurrentUser();
+    if (user != null) {
+      if (user.getEmail() != null && !user.getEmail().isEmpty()) {
+        return user.getEmail();
+      }
+      if (user.getDisplayName() != null && !user.getDisplayName().isEmpty()) {
+        return user.getDisplayName();
+      }
+    }
+    return null;
   }
 
   protected void onSignOut() {
@@ -198,33 +297,16 @@ public abstract class BaseTriplesActivity extends AppCompatActivity
   }
 
   @Override
-  public void onConnected(@Nullable Bundle bundle) {
-    if (mSignInListener != null) {
-      mSignInListener.onSignInStateChanged(isSignedIn());
+  protected void onDestroy() {
+    if (mOnStateChangedListener != null) {
+      Application.getInstance(this).removeOnStateChangedListener(mOnStateChangedListener);
+      mOnStateChangedListener = null;
     }
-  }
-
-  @Override
-  public void onConnectionSuspended(int i) {
-    if (mSignInListener != null) {
-      mSignInListener.onSignInStateChanged(isSignedIn());
-    }
-  }
-
-  @Override
-  public void onConnectionFailed(ConnectionResult connectionResult) {
-    // An unresolvable error has occurred and Google APIs (including Sign-In) will not
-    // be available.
-    Log.d(TAG, "onConnectionFailed:" + connectionResult);
-    mSignInListener.onSignInStateChanged(isSignedIn());
+    super.onDestroy();
   }
 
   @Override
   protected void onStop() {
     super.onStop();
-  }
-
-  public GoogleApiClient getApiClient() {
-    return mGoogleApiClient;
   }
 }

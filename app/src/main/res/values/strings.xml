@@ -9,6 +9,10 @@
   <string name="games_no_items">No games played yet.\nTap + to create a new game.</string>
   <string name="list_of_games">LIST OF GAMES</string>
   <string name="new_game">New Game</string>
+  <string name="resume_game">Resume</string>
+  <string name="resume_game_classic_format">Resume (%1$d left)</string>
+  <string name="resume_game_arcade_format">Resume (%1$d found)</string>
+  <string name="start_again">Start Again</string>
   <string name="no_current_games">No Current Games.\nTo start a new game, click +.</string>
   <string name="current">CURRENT</string>
   <string name="completed">COMPLETED</string>
@@ -43,6 +47,7 @@
   <string name="average_time">Average time:</string>
   <string name="period">Period:</string>
   <string name="statistics">STATISTICS</string>
+  <string name="statistics_format">STATISTICS (%1$d played)</string>
   <string name="all_time">All Time</string>
   <string name="past_day">Past Day</string>
   <string name="past_week">Past Week</string>
@@ -57,16 +62,104 @@
   <string name="date_played">DATE PLAYED</string>
   <string name="time_taken">TIME TAKEN</string>
   <string name="sign_in_why">Sign in with Google to share your scores with your friends.</string>
-  <string name="app_id">434215387101</string>
   <string name="leaderboards">Google Play Leaderboards</string>
   <string name="signout">Sign Out</string>
   <string name="time_remaining">TIME REMAINING</string>
   <string name="triples_found">TRIPLES FOUND</string>
   <string name="drawer_open">Open navigation drawer</string>
   <string name="drawer_close">Close navigation drawer</string>
+  <string name="game_modes_title">GAME MODES</string>
   <string name="arcade_label">Arcade</string>
   <string name="classic_label">Classic</string>
+  <string name="daily_label">Daily Puzzle</string>
+  <string name="zen_label">Zen</string>
+  <string name="beginner_label">Beginner</string>
   <string name="game_completed">GAME COMPLETED</string>
-    <string name="hint">Hint</string>
+  <string name="hint">Hint</string>
+  <string name="shuffle">Shuffle</string>
+    <string name="fastest_triple">Fastest triple:</string>
+    <string name="slowest_triple">Slowest triple:</string>
+    <string name="time_taken_field">Time taken:</string>
+    <string name="triples_found_field">Triples found:</string>
+    <string name="arcade_completed_stats">%1$d triples</string>
+    <string name="classic_completed_stats_format">%1$dm %2$02ds</string>
+    <string name="classic_completed_stats_seconds_format">%1$ds</string>
+
+    <string name="hint_confirmation_title">Use a hint?</string>
+    <string name="hint_confirmation_message">Are you sure you want to use a hint? This game will not count towards your statistics or leaderboards.</string>
+    <string name="dont_ask_again">Don\'t ask again</string>
+
+    <string name="pref_hide_hint_title">Hide Hint Icon</string>
+    <string name="pref_hide_hint_summary">Hide the hint icon in the game action bar</string>
+
+    <string name="hint_used_indicator">HINT USED</string>
+
+    <string name="cards_remaining_format">Cards remaining: %1$d</string>
+    <string name="triples_found_format">Triples found: %1$d</string>
+    <string name="triples_found_of_format">Triples found: %1$d / %2$d</string>
+
+  <string name="color_0">Color 1</string>
+  <string name="color_1">Color 2</string>
+  <string name="color_2">Color 3</string>
+
+  <string name="shape_0">Shape 1</string>
+  <string name="shape_1">Shape 2</string>
+  <string name="shape_2">Shape 3</string>
+
+  <string name="shaded_pattern">Shaded Pattern</string>
+
+  <string name="pref_animation_duration_title">Animation Duration</string>
+  <string name="pref_animation_duration_summary">%1$d ms</string>
+
+  <string name="export_to_csv">Export to CSV</string>
+
+  <string name="performance_classic_new_best">New personal best!</string>
+  <string name="performance_classic_better_than_average">Faster than your average!</string>
+  <string name="performance_classic_worse_than_average">Keep practicing to beat your average!</string>
+  <string name="performance_classic_best_year">Best score this year!</string>
+  <string name="performance_classic_best_month">Best score this month!</string>
+  <string name="performance_classic_best_week">Best score this week!</string>
+  <string name="performance_classic_best_day">Best score today!</string>
+  <string name="performance_arcade_new_best">New record for triples found!</string>
+  <string name="performance_arcade_better_than_average">More triples than your average!</string>
+  <string name="performance_arcade_worse_than_average">Keep practicing to beat your average!</string>
+  <string name="performance_arcade_best_year">Most triples this year!</string>
+  <string name="performance_arcade_best_month">Most triples this month!</string>
+  <string name="performance_arcade_best_week">Most triples this week!</string>
+  <string name="performance_arcade_best_day">Most triples today!</string>
+  <string name="performance_first_game">Your first game!</string>
+  <string name="performance_hints_used">Hints were used - game not added to statistics.</string>
+
+  <string name="rate_app">Rate App</string>
+
+  <string name="classic_description">Go through the whole deck (81 cards) in the shortest time possible. This requires patience and perseverance.</string>
+  <string name="arcade_description">Find as many triples as you can in 60 seconds.</string>
+  <string name="zen_description">Unlimited play with a continuously recycled and reshuffled deck. No timer or counts are tracked.</string>
+  <string name="daily_puzzle_description">Find all possible triples in a fixed set of 15 cards. A new puzzle is available every day.</string>
+  <string name="beginner_tutorial_button">Beginner Tutorial</string>
+
+  <string name="beginner_title">Beginner Mode</string>
+  <string name="zen_title">Zen</string>
+  <string name="beginner_note">Beginner Mode: All cards have the same pattern (outline only).</string>
+  <string name="current_streak">Current Streak</string>
+  <string name="longest_streak">Longest Streak</string>
+  <string name="total_solved">Total Solved</string>
+  <string name="today">Today</string>
+  <string name="daily_not_started">Not Started</string>
+  <string name="daily_incomplete">Incomplete</string>
+  <string name="daily_completed">Completed</string>
+  <string name="daily_hints_used_suffix">(hints used)</string>
+
+  <string name="account_settings">Account</string>
+  <string name="account_user_title">User</string>
+  <string name="account_not_signed_in">Not signed in</string>
+  <string name="account_signed_in_as">Signed in as %1$s</string>
+  <string name="account_sign_in">Sign In</string>
+  <string name="account_sign_out">Sign Out</string>
+  <string name="account_delete_data_title">Delete All Data</string>
+  <string name="account_delete_data_summary">Permanently delete all local and cloud game data</string>
+  <string name="account_delete_data_dialog_title">Delete all data</string>
+  <string name="account_delete_data_dialog_message">This will permanently delete all your game statistics and progress from both this device and the cloud. This action cannot be undone. Confirm deletion</string>
+  <string name="account_delete_button">Delete</string>
 
 </resources>

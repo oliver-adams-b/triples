@@ -1,106 +1,87 @@
 package com.antsapps.triples.cardsview;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.ColorFilter;
-import android.graphics.Paint.Style;
+import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.Rect;
 import android.graphics.Shader;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.ShapeDrawable;
-import android.graphics.drawable.shapes.OvalShape;
-import android.graphics.drawable.shapes.RectShape;
 import android.graphics.drawable.shapes.Shape;
-
+import androidx.preference.PreferenceManager;
+import com.antsapps.triples.CardCustomizationUtils;
+import com.antsapps.triples.R;
 import com.antsapps.triples.backend.Card;
-import com.google.common.primitives.Ints;
 
-import java.util.Arrays;
+public class SymbolDrawable extends Drawable {
 
-class SymbolDrawable extends Drawable {
-
-  private static final int OUTLINE_WIDTH = 4;
-  private static final int STRIPE_WIDTH = 3;
+  public static final int OUTLINE_WIDTH = 2;
 
   private final Card mCard;
 
   private final ShapeDrawable mOutline;
   private final ShapeDrawable mFill;
 
-  SymbolDrawable(Card card) {
+  public SymbolDrawable(Context context, Card card) {
     mCard = card;
-    mOutline = getOutlineForCard(card);
-    mFill = getFillForCard(card);
+    mOutline = getOutlineForCard(context, card);
+    mFill = getFillForCard(context, card);
   }
 
-  private static ShapeDrawable getOutlineForCard(Card card) {
-    ShapeDrawable symbol = new ShapeDrawable(getShapeForId(card.mShape));
-    symbol.getPaint().setColor(getColorForId(card.mColor));
-    symbol.getPaint().setStyle(Style.STROKE);
-    symbol.getPaint().setStrokeWidth(OUTLINE_WIDTH);
+  private static ShapeDrawable getOutlineForCard(Context context, Card card) {
+    ShapeDrawable symbol = new ShapeDrawable(getShapeForId(context, card.mShape));
+    symbol.getPaint().setColor(getColorForId(context, card.mColor));
+    symbol.getPaint().setStyle(Paint.Style.STROKE);
+    float density = context.getResources().getDisplayMetrics().density;
+    symbol.getPaint().setStrokeWidth(OUTLINE_WIDTH * density);
     return symbol;
   }
 
-  private static ShapeDrawable getFillForCard(Card card) {
-    ShapeDrawable symbol = new ShapeDrawable(getShapeForId(card.mShape));
-    symbol.getPaint().setShader(getShaderForPatternId(card.mPattern, card.mColor));
-    symbol.getPaint().setStyle(Style.FILL);
+  private static ShapeDrawable getFillForCard(Context context, Card card) {
+    ShapeDrawable symbol = new ShapeDrawable(getShapeForId(context, card.mShape));
+    symbol.getPaint().setShader(getShaderForPatternId(context, card.mPattern, card.mColor));
+    symbol.getPaint().setStyle(Paint.Style.FILL);
     return symbol;
   }
 
-  private static Shader getShaderForPatternId(int patternId, int colorId) {
-    int color = getColorForId(colorId);
-    int thickness = STRIPE_WIDTH;
-    int[] pixels;
-    Bitmap bm;
+  private static Shader getShaderForPatternId(Context context, int patternId, int colorId) {
+    int color = getColorForId(context, colorId);
     switch (patternId) {
       case 0: // Empty
-        pixels = new int[] {0};
-        break;
-      case 1: // Stripes
-        pixels = Ints.concat(initIntArray(color, thickness), initIntArray(0, thickness));
-        break;
+        return new BitmapShader(
+            Bitmap.createBitmap(new int[] {0}, 1, 1, Bitmap.Config.ARGB_8888),
+            Shader.TileMode.REPEAT,
+            Shader.TileMode.REPEAT);
+      case 1: // Customizable Shaded
+        return getCustomShadedShader(context, color);
       case 2: // Solid
-        pixels = new int[] {color};
-        break;
+        return new BitmapShader(
+            Bitmap.createBitmap(new int[] {color}, 1, 1, Bitmap.Config.ARGB_8888),
+            Shader.TileMode.REPEAT,
+            Shader.TileMode.REPEAT);
       default:
         return null;
     }
-    bm = Bitmap.createBitmap(pixels, pixels.length, 1, Bitmap.Config.ARGB_8888);
-    return new BitmapShader(bm, Shader.TileMode.REPEAT, Shader.TileMode.REPEAT);
   }
 
-  private static int[] initIntArray(int value, int length) {
-    int[] arr = new int[length];
-    Arrays.fill(arr, value);
-    return arr;
+  private static Shader getCustomShadedShader(Context context, int color) {
+    SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+    String pattern =
+        sharedPref.getString(context.getString(R.string.pref_shaded_pattern), "stripes");
+    return CardCustomizationUtils.getCustomShadedShader(context, color, pattern);
   }
 
-  private static Shape getShapeForId(int id) {
-    switch (id) {
-      case 0: // Square
-        return new RectShape();
-      case 1: // Circle
-        return new OvalShape();
-      case 2: // Triangle
-      default:
-        return new TriangleShape();
-    }
+  public static Shape getShapeForId(Context context, int id) {
+    return CardCustomizationUtils.getShapeForId(context, id);
   }
 
-  private static int getColorForId(int id) {
-    switch (id) {
-      case 0:
-        return Color.parseColor("#33B5E5"); // Holo Light Blue
-      case 1:
-        return Color.parseColor("#FFBB33"); // Holo Light Orange
-      case 2:
-        return Color.parseColor("#FF4444"); // Holo Light Red
-    }
-    return 0;
+  public static int getColorForId(Context context, int id) {
+    return CardCustomizationUtils.getColorForId(context, id);
   }
 
   @Override

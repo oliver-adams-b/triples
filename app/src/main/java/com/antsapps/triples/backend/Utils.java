@@ -1,9 +1,12 @@
 package com.antsapps.triples.backend;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-
+import com.google.common.collect.Sets;
+import java.nio.ByteBuffer;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 public class Utils {
 
@@ -49,6 +52,53 @@ public class Utils {
       cards.add(cardFromByte(b[i]));
     }
     return cards;
+  }
+
+  public static byte[] longListToByteArray(List<Long> longs) {
+    ByteBuffer bb = ByteBuffer.allocate(longs.size() * 8);
+    for (long l : longs) {
+      bb.putLong(l);
+    }
+    return bb.array();
+  }
+
+  public static List<Long> longListFromByteArray(byte[] b) {
+    if (b == null) {
+      return Lists.newArrayList();
+    }
+    ByteBuffer bb = ByteBuffer.wrap(b);
+    List<Long> longs = Lists.newArrayList();
+    while (bb.hasRemaining()) {
+      longs.add(bb.getLong());
+    }
+    return longs;
+  }
+
+  public static byte[] triplesListToByteArray(List<Set<Card>> triples) {
+    ByteBuffer bb = ByteBuffer.allocate(triples.size() * 3);
+    for (Set<Card> triple : triples) {
+      Preconditions.checkArgument(triple.size() == 3, "triple must have 3 cards");
+      for (Card card : triple) {
+        bb.put(cardToByte(card));
+      }
+    }
+    return bb.array();
+  }
+
+  public static List<Set<Card>> triplesListFromByteArray(byte[] b) {
+    if (b == null) {
+      return Lists.newArrayList();
+    }
+    ByteBuffer bb = ByteBuffer.wrap(b);
+    List<Set<Card>> triples = Lists.newArrayList();
+    while (bb.hasRemaining()) {
+      Set<Card> triple = Sets.newHashSet();
+      for (int i = 0; i < 3; i++) {
+        triple.add(cardFromByte(bb.get()));
+      }
+      triples.add(triple);
+    }
+    return triples;
   }
 
   private Utils() {}

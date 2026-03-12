@@ -9,13 +9,12 @@ import android.widget.AdapterView.OnItemSelectedListener;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.Spinner;
-
+import android.widget.TextView;
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.DatePeriod;
 import com.antsapps.triples.backend.NumGamesPeriod;
 import com.antsapps.triples.backend.Period;
 import com.google.common.collect.Maps;
-
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -101,6 +100,10 @@ class StatisticsSelectorView extends FrameLayout {
 
   public void setOnPeriodChangeListener(OnPeriodChangeListener listener) {
     mOnPeriodChangeListener = listener;
+  }
+
+  protected void setAccentColor(int accentColor) {
+    ((TextView) findViewById(R.id.selector_title)).setTextColor(accentColor);
   }
 
   public Period getPeriod() {

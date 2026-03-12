@@ -10,33 +10,44 @@ public class ArcadeGame extends Game implements OnTimerTickListener {
   public static final long TIME_LIMIT_MS = 1 * 60 * 1000;
   public static final String GAME_TYPE_FOR_ANALYTICS = "arcade";
 
-  private int mNumTriplesFound;
-
   public static ArcadeGame createFromSeed(long seed) {
     ArcadeGame game =
         new ArcadeGame(
             -1,
             seed,
             Collections.<Card>emptyList(),
+            Collections.<Long>emptyList(),
             new Deck(new Random(seed)),
             0,
             new Date(),
             GameState.STARTING,
-            0);
+            0,
+            false);
     game.init();
     return game;
   }
 
-  ArcadeGame(
+  public ArcadeGame(
       long id,
       long seed,
       List<Card> cardsInPlay,
+      List<Long> tripleFindTimes,
       Deck cardsInDeck,
       long timeElapsed,
-      Date date,
+      Date dateStarted,
       GameState gameState,
-      int numTriplesFound) {
-    super(id, seed, cardsInPlay, cardsInDeck, timeElapsed, date, gameState);
+      int numTriplesFound,
+      boolean hintsUsed) {
+    super(
+        id,
+        seed,
+        cardsInPlay,
+        tripleFindTimes,
+        cardsInDeck,
+        timeElapsed,
+        dateStarted,
+        gameState,
+        hintsUsed);
     mNumTriplesFound = numTriplesFound;
     mTimer.addOnTimerTickListener(this);
   }
@@ -83,7 +94,8 @@ public class ArcadeGame extends Game implements OnTimerTickListener {
     }
   }
 
-  public int getNumTriplesFound() {
-    return mNumTriplesFound;
+  @Override
+  public boolean isNumTriplesFoundRelevant() {
+    return true;
   }
 }

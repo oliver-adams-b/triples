@@ -5,13 +5,11 @@ import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
-
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.ArcadeGame;
 import com.antsapps.triples.backend.ArcadeStatistics;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.Statistics;
-
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
@@ -34,6 +32,13 @@ public class ArcadeStatisticsSummaryView extends BaseStatisticsSummaryView {
     mNumberOfGames = (TextView) findViewById(R.id.number_completed);
     mBest = (TextView) findViewById(R.id.best);
     mAverage = (TextView) findViewById(R.id.average);
+  }
+
+  @Override
+  protected void setAccentColor(int accentColor) {
+    ((TextView) findViewById(R.id.summary_title)).setTextColor(accentColor);
+    findViewById(R.id.summary_divider).setBackgroundColor(accentColor);
+    mGraphView.setAccentColor(accentColor);
   }
 
   private static String convertTimeToString(long timeMS) {

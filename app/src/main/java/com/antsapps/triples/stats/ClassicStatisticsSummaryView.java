@@ -5,12 +5,10 @@ import android.text.format.DateUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
-
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.ClassicStatistics;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.Statistics;
-
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 
@@ -32,6 +30,13 @@ public class ClassicStatisticsSummaryView extends BaseStatisticsSummaryView {
     mNumberOfGames = (TextView) findViewById(R.id.number_completed);
     mFastestTime = (TextView) findViewById(R.id.best);
     mAverageTime = (TextView) findViewById(R.id.average);
+  }
+
+  @Override
+  protected void setAccentColor(int accentColor) {
+    ((TextView) findViewById(R.id.summary_title)).setTextColor(accentColor);
+    findViewById(R.id.summary_divider).setBackgroundColor(accentColor);
+    mGraphView.setAccentColor(accentColor);
   }
 
   private static String convertTimeToString(long timeMS) {

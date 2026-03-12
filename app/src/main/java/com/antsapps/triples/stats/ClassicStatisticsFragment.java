@@ -7,14 +7,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
-
-import com.antsapps.triples.GamesServices;
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.ClassicGame;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.Period;
+import com.antsapps.triples.util.CsvUtil;
 import com.google.common.collect.Lists;
-
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -37,9 +36,12 @@ public class ClassicStatisticsFragment extends BaseStatisticsFragment {
 
       Game g = getItem(position);
       if (g != null) {
-        ((TextView) v.findViewById(R.id.result))
-            .setText(
-                DateUtils.formatElapsedTime(TimeUnit.MILLISECONDS.toSeconds(g.getTimeElapsed())));
+        String result =
+            DateUtils.formatElapsedTime(TimeUnit.MILLISECONDS.toSeconds(g.getTimeElapsed()));
+        if (g.areHintsUsed()) {
+          result += " (hinted)";
+        }
+        ((TextView) v.findViewById(R.id.result)).setText(result);
         ((TextView) v.findViewById(R.id.date_played))
             .setText(DateUtils.formatDateTime(getContext(), g.getDateStarted().getTime(), 0));
       }
@@ -63,8 +65,13 @@ public class ClassicStatisticsFragment extends BaseStatisticsFragment {
     return new ClassicStatisticsSummaryView(getActivity());
   }
 
+  @Override
+  protected String getGameType() {
+    return "Classic";
+  }
+
   protected String getLeaderboardId() {
-    return GamesServices.Leaderboard.CLASSIC;
+    return getString(R.string.leaderboard_classic_game);
   }
 
   protected void deleteGame(Game game) {
@@ -79,5 +86,14 @@ public class ClassicStatisticsFragment extends BaseStatisticsFragment {
   @Override
   protected void updateDataSet() {
     onStatisticsChange(mApplication.getClassicStatistics(mSelectorView.getPeriod()));
+  }
+
+  @Override
+  public void exportToCsv() {
+    List<Game> games = new ArrayList<>();
+    for (int i = 0; i < mAdapter.getCount(); i++) {
+      games.add(mAdapter.getItem(i));
+    }
+    shareCsv("classic_statistics.csv", CsvUtil.getClassicCsvContent(games));
   }
 }

@@ -1,20 +1,18 @@
 package com.antsapps.triples.stats;
 
-import android.app.Activity;
 import android.content.Context;
-import android.content.Intent;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
-
-import com.antsapps.triples.BaseGameListActivity;
 import com.antsapps.triples.BaseTriplesActivity;
 import com.antsapps.triples.R;
-import com.google.android.gms.games.Games;
+import com.google.android.gms.games.PlayGames;
 
 class StatisticsGamesServicesView extends FrameLayout
     implements View.OnClickListener, BaseTriplesActivity.OnSignInListener {
 
+  private static final String TAG = "StatsGamesServicesView";
   private BaseTriplesActivity mActivity;
   private View mSignInBar;
   private View mGamesServicesBar;
@@ -37,7 +35,7 @@ class StatisticsGamesServicesView extends FrameLayout
     updateSignedInState();
   }
 
-  public void setActivity(BaseGameListActivity activity) {
+  public void setActivity(BaseTriplesActivity activity) {
     mActivity = activity;
     updateSignedInState();
   }
@@ -48,9 +46,16 @@ class StatisticsGamesServicesView extends FrameLayout
       // start the asynchronous sign in flow
       mActivity.signIn();
     } else if (view.getId() == R.id.leaderboards) {
-      Intent leaderboardIntent =
-          Games.Leaderboards.getLeaderboardIntent(mActivity.getApiClient(), mLeaderboardId);
-      ((Activity) getContext()).startActivityForResult(leaderboardIntent, 26);
+      PlayGames.getLeaderboardsClient(mActivity)
+          .getLeaderboardIntent(mLeaderboardId)
+          .addOnCompleteListener(
+              task -> {
+                if (task.isSuccessful()) {
+                  mActivity.startActivityForResult(task.getResult(), 26);
+                } else {
+                  Log.e(TAG, "Error getting leaderboard intent", task.getException());
+                }
+              });
     }
   }
 

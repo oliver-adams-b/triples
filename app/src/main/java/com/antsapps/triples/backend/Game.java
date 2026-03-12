@@ -1,13 +1,11 @@
 package com.antsapps.triples.backend;
 
 import androidx.annotation.Nullable;
-
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,7 +30,7 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
         int numRemaining,
         int numTriplesFound);
 
-    void onCardHinted(Card card);
+    void animateFoundTriple(Set<Card> triple, boolean hintUsed);
   }
 
   public interface GameRenderer {
@@ -41,6 +39,8 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     void addHint(Card card);
 
     void clearHintedCards();
+
+    void clearSelectedCards();
 
     Set<Card> getSelectedCards();
   }
@@ -64,13 +64,17 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
 
   private boolean mActivitiyLifecycleActive;
 
-  private int mNumTriplesFound;
+  protected int mNumTriplesFound;
 
   protected final Deck mDeck;
 
   protected final List<Card> mCardsInPlay;
 
-  private final Set<Card> mHintedCards = Sets.newHashSet();
+  protected final List<Long> mTripleFindTimes;
+
+  protected final Set<Card> mHintedCards = Sets.newHashSet();
+
+  protected boolean mHintsUsed;
 
   protected final Timer mTimer;
 
@@ -78,9 +82,9 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
 
   private long id;
 
-  private final Date mDate;
+  private final Date mDateStarted;
 
-  private GameRenderer mGameRenderer;
+  protected GameRenderer mGameRenderer;
 
   private final List<OnUpdateGameStateListener> mGameStateListeners = Lists.newArrayList();
 
@@ -90,17 +94,21 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
       long id,
       long seed,
       List<Card> cardsInPlay,
+      List<Long> tripleFindTimes,
       Deck cardsInDeck,
       long timeElapsed,
-      Date date,
-      GameState gameState) {
+      Date dateStarted,
+      GameState gameState,
+      boolean hintsUsed) {
     this.id = id;
     mRandomSeed = seed;
     mCardsInPlay = Lists.newArrayList(cardsInPlay);
+    mTripleFindTimes = Lists.newArrayList(tripleFindTimes);
     mDeck = cardsInDeck;
     mTimer = new Timer(timeElapsed);
-    mDate = date;
+    mDateStarted = dateStarted;
     mGameState = gameState;
+    mHintsUsed = hintsUsed;
   }
 
   public void setGameRenderer(GameRenderer gameRenderer) {
@@ -192,7 +200,8 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     }
   }
 
-  public void onValidTripleSelected(Collection<Card> cards) {
+  @Override
+  public void onValidTripleSelected(Set<Card> cards) {
     commitTriple(Iterables.toArray(cards, Card.class));
   }
 
@@ -203,15 +212,45 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
       throw new IllegalArgumentException(
           "Cards are not in the set. cards = " + cards + ", mCardsInPlay = " + mCardsInPlay);
     }
-    if (!isValidTriple(cards)) {
-      throw new IllegalArgumentException("Cards are not a valid triple");
+    if (!isValidFoundTriple(cards)) {
+      return;
     }
 
-    mNumTriplesFound++;
+    recordFoundTriple(cards);
+
+    boolean hintUsed = false;
+    for (Card c : cards) {
+      if (mHintedCards.contains(c)) {
+        hintUsed = true;
+        break;
+      }
+    }
 
     mHintedCards.clear();
     mGameRenderer.clearHintedCards();
+    mGameRenderer.clearSelectedCards();
 
+    updateDeckAfterValidTriple(cards);
+
+    for (OnUpdateCardsInPlayListener listener : mCardsInPlayListeners) {
+      listener.animateFoundTriple(Sets.newHashSet(cards), hintUsed);
+    }
+
+    dispatchCardsInPlayUpdate(oldCards);
+
+    checkIfFinished();
+  }
+
+  protected boolean isValidFoundTriple(Card... cards) {
+    return isValidTriple(cards);
+  }
+
+  protected void recordFoundTriple(Card... cards) {
+    mNumTriplesFound++;
+    mTripleFindTimes.add(mTimer.getElapsed());
+  }
+
+  protected void updateDeckAfterValidTriple(Card... cards) {
     for (int i = 0; i < 3; i++) {
       mCardsInPlay.set(mCardsInPlay.indexOf(cards[i]), null);
     }
@@ -240,9 +279,9 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
         mCardsInPlay.add(mDeck.getNextCard());
       }
     }
-
-    dispatchCardsInPlayUpdate(oldCards);
   }
+
+  protected void checkIfFinished() {}
 
   protected void finish() {
     if (mGameState == GameState.COMPLETED) {
@@ -330,6 +369,18 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     return null;
   }
 
+  public static List<Set<Card>> getAllValidTriples(List<Card> cards) {
+    List<Set<Card>> validTriples = Lists.newArrayList();
+    Set<Card> distinctCards = Sets.newHashSet(cards);
+    distinctCards.remove(null);
+    for (Set<Card> subset : Sets.combinations(distinctCards, 3)) {
+      if (isValidTriple(subset)) {
+        validTriples.add(subset);
+      }
+    }
+    return validTriples;
+  }
+
   private static int numNotNull(Iterable<Card> cards) {
     int countNotNull = 0;
     for (Card card : cards) {
@@ -349,9 +400,11 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     }
   }
 
-  private void dispatchCardsInPlayUpdate(ImmutableList<Card> oldCards) {
+  protected void dispatchCardsInPlayUpdate(ImmutableList<Card> oldCards) {
     ImmutableList<Card> newCards = ImmutableList.copyOf(mCardsInPlay);
-    mGameRenderer.updateCardsInPlay(newCards);
+    if (mGameRenderer != null) {
+      mGameRenderer.updateCardsInPlay(newCards);
+    }
     for (OnUpdateCardsInPlayListener listener : mCardsInPlayListeners) {
       listener.onUpdateCardsInPlay(newCards, oldCards, getCardsRemaining(), mNumTriplesFound);
     }
@@ -359,6 +412,10 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
 
   public int getCardsRemaining() {
     return mDeck.getCardsRemaining() + mCardsInPlay.size();
+  }
+
+  public List<Card> getCardsInPlay() {
+    return ImmutableList.copyOf(mCardsInPlay);
   }
 
   byte[] getCardsInPlayAsByteArray() {
@@ -379,7 +436,7 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
 
   @Override
   public int compareTo(Game another) {
-    return (int) Utils.compareTo(mDate, id, another.mDate, another.id);
+    return (int) Utils.compareTo(mDateStarted, id, another.mDateStarted, another.id);
   }
 
   public long getRandomSeed() {
@@ -390,12 +447,28 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     return mTimer.getElapsed();
   }
 
+  public List<Long> getTripleFindTimes() {
+    return ImmutableList.copyOf(mTripleFindTimes);
+  }
+
+  public int getNumTriplesFound() {
+    return mNumTriplesFound;
+  }
+
+  public boolean isNumTriplesFoundRelevant() {
+    return false;
+  }
+
   public Date getDateStarted() {
-    return mDate;
+    return mDateStarted;
   }
 
   public GameState getGameState() {
     return mGameState;
+  }
+
+  public boolean areHintsUsed() {
+    return mHintsUsed;
   }
 
   public boolean getActivityLifecycleActive() {
@@ -414,23 +487,73 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
   }
 
   public boolean addHint() {
+    mHintsUsed = true;
     if (mHintedCards.size() == 3) {
       return false;
     }
 
-    // Calculate hinted card
-    Set<Card> validTripleIncludingExistingHintedCards =
-        getAValidTriple(mCardsInPlay, Sets.newHashSet(mHintedCards));
-    Card cardToHint =
-        Iterables.getFirst(
-            Sets.difference(validTripleIncludingExistingHintedCards, mHintedCards), null);
-    mHintedCards.add(cardToHint);
+    Set<Card> selectedCards = mGameRenderer.getSelectedCards();
 
-    // Notify renderer & listeners
-    mGameRenderer.addHint(cardToHint);
-    for (OnUpdateCardsInPlayListener listener : mCardsInPlayListeners) {
-      listener.onCardHinted(cardToHint);
+    // Calculate target triple
+    Set<Card> targetTriple;
+    if (mHintedCards.isEmpty()) {
+      targetTriple = findValidTripleIncludingSelected(selectedCards);
+    } else {
+      targetTriple = getAValidTriple(mCardsInPlay, Sets.newHashSet(mHintedCards));
     }
+
+    if (targetTriple == null) {
+      return false;
+    }
+
+    boolean hintedNewCard = false;
+
+    // 1. Hint all selected cards in the triple that aren't hinted yet.
+    // This ensures they stay selected in the UI.
+    for (Card c : targetTriple) {
+      if (selectedCards.contains(c) && !mHintedCards.contains(c)) {
+        dispatchHint(c);
+      }
+    }
+
+    // 2. Hint at least one card that was not selected (the "actual" hint).
+    for (Card c : targetTriple) {
+      if (!mHintedCards.contains(c) && !selectedCards.contains(c)) {
+        dispatchHint(c);
+        hintedNewCard = true;
+        break;
+      }
+    }
+
+    // 3. Fallback: if we haven't hinted a new card (e.g. all remaining cards in the triple
+    // are selected), hint one of them.
+    if (!hintedNewCard && mHintedCards.size() < 3) {
+      for (Card c : targetTriple) {
+        if (!mHintedCards.contains(c)) {
+          dispatchHint(c);
+          break;
+        }
+      }
+    }
+
     return true;
+  }
+
+  protected void dispatchHint(Card card) {
+    if (mHintedCards.add(card)) {
+      mGameRenderer.addHint(card);
+    }
+  }
+
+  private Set<Card> findValidTripleIncludingSelected(Set<Card> selectedCards) {
+    for (int i = selectedCards.size(); i > 0; i--) {
+      for (Set<Card> subset : Sets.combinations(selectedCards, i)) {
+        Set<Card> triple = getAValidTriple(mCardsInPlay, Sets.newHashSet(subset));
+        if (triple != null) {
+          return triple;
+        }
+      }
+    }
+    return getAValidTriple(mCardsInPlay, Sets.<Card>newHashSet());
   }
 }

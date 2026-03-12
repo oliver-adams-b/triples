@@ -7,14 +7,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.TextView;
-
-import com.antsapps.triples.GamesServices;
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.ArcadeGame;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.Period;
+import com.antsapps.triples.util.CsvUtil;
 import com.google.common.collect.Lists;
-
+import java.util.ArrayList;
 import java.util.List;
 
 public class ArcadeStatisticsFragment extends BaseStatisticsFragment {
@@ -36,7 +35,11 @@ public class ArcadeStatisticsFragment extends BaseStatisticsFragment {
 
       ArcadeGame g = (ArcadeGame) getItem(position);
       if (g != null) {
-        ((TextView) v.findViewById(R.id.result)).setText(String.valueOf(g.getNumTriplesFound()));
+        String result = String.valueOf(g.getNumTriplesFound());
+        if (g.areHintsUsed()) {
+          result += " (hinted)";
+        }
+        ((TextView) v.findViewById(R.id.result)).setText(result);
         ((TextView) v.findViewById(R.id.date_played))
             .setText(DateUtils.formatDateTime(getContext(), g.getDateStarted().getTime(), 0));
       }
@@ -60,8 +63,13 @@ public class ArcadeStatisticsFragment extends BaseStatisticsFragment {
     return new ArcadeStatisticsSummaryView(getActivity());
   }
 
+  @Override
+  protected String getGameType() {
+    return "Arcade";
+  }
+
   protected String getLeaderboardId() {
-    return GamesServices.Leaderboard.ARCADE;
+    return getString(R.string.leaderboard_arcade_game);
   }
 
   protected void deleteGame(Game game) {
@@ -76,5 +84,14 @@ public class ArcadeStatisticsFragment extends BaseStatisticsFragment {
   @Override
   protected void updateDataSet() {
     onStatisticsChange(mApplication.getArcadeStatistics(mSelectorView.getPeriod()));
+  }
+
+  @Override
+  public void exportToCsv() {
+    List<Game> games = new ArrayList<>();
+    for (int i = 0; i < mAdapter.getCount(); i++) {
+      games.add(mAdapter.getItem(i));
+    }
+    shareCsv("arcade_statistics.csv", CsvUtil.getArcadeCsvContent(games));
   }
 }

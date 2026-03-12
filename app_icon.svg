@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Card 1 (Back-Left) -->
+  <g>
+    <rect x="108" y="88" width="240" height="144" rx="8" fill="#B0B0B0"/>
+    <rect x="100" y="80" width="240" height="144" rx="8" fill="#FFFFFF" stroke="#C4C7CC" stroke-width="2"/>
+    <!-- Card 1 Center X: 220, Y: 152. 3 squares of 56px width with 10px spacing: 56+10+56+10+56 = 188px total width.
+         (240 - 188) / 2 = 26px start offset from card X. X starts at 100+26=126.
+         (144 - 56) / 2 = 44px start offset from card Y. Y starts at 80+44=124. -->
+    <rect x="126" y="124" width="56" height="56" fill="#2196F3"/>
+    <rect x="192" y="124" width="56" height="56" fill="#2196F3"/>
+    <rect x="258" y="124" width="56" height="56" fill="#2196F3"/>
+  </g>
+
+  <!-- Card 2 (Middle) -->
+  <g>
+    <rect x="144" y="192" width="240" height="144" rx="8" fill="#B0B0B0"/>
+    <rect x="136" y="184" width="240" height="144" rx="8" fill="#FFFFFF" stroke="#C4C7CC" stroke-width="2"/>
+    <!-- Card 2 Center X: 256, Y: 256. 2 triangles of 56px width with 10px spacing: 56+10+56 = 122px total width.
+         (240 - 122) / 2 = 59px start offset from card X. X starts at 136+59=195.
+         Y offset remains (144 - 56) / 2 = 44px. Y starts at 184+44=228. -->
+    <path d="M 195 284 L 223 228 L 251 284 Z" fill="#FF9800"/>
+    <path d="M 261 284 L 289 228 L 317 284 Z" fill="#FF9800"/>
+  </g>
+
+  <!-- Card 3 (Front-Right) -->
+  <g>
+    <rect x="180" y="296" width="240" height="144" rx="8" fill="#B0B0B0"/>
+    <rect x="172" y="288" width="240" height="144" rx="8" fill="#FFFFFF" stroke="#C4C7CC" stroke-width="2"/>
+    <!-- Card 3 Center X: 292, Y: 360. Circle radius 28. -->
+    <circle cx="292" cy="360" r="28" fill="#F44336"/>
+  </g>
+</svg>

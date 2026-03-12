@@ -15,23 +15,36 @@ public class ClassicGame extends Game {
             -1,
             seed,
             Collections.<Card>emptyList(),
+            Collections.<Long>emptyList(),
             new Deck(new Random(seed)),
             0,
             new Date(),
-            GameState.STARTING);
+            GameState.STARTING,
+            false);
     game.init();
     return game;
   }
 
-  ClassicGame(
+  public ClassicGame(
       long id,
       long seed,
       List<Card> cardsInPlay,
+      List<Long> tripleFindTimes,
       Deck cardsInDeck,
       long timeElapsed,
-      Date date,
-      GameState gameState) {
-    super(id, seed, cardsInPlay, cardsInDeck, timeElapsed, date, gameState);
+      Date dateStarted,
+      GameState gameState,
+      boolean hintsUsed) {
+    super(
+        id,
+        seed,
+        cardsInPlay,
+        tripleFindTimes,
+        cardsInDeck,
+        timeElapsed,
+        dateStarted,
+        gameState,
+        hintsUsed);
   }
 
   /**
@@ -59,9 +72,7 @@ public class ClassicGame extends Game {
   }
 
   @Override
-  public void commitTriple(Card... cards) {
-    super.commitTriple(cards);
-
+  protected void checkIfFinished() {
     if (!checkIfAnyValidTriples()) {
       finish();
     }

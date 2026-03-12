@@ -2,24 +2,20 @@ package com.antsapps.triples;
 
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
 import android.text.format.DateUtils;
 import android.view.ViewStub;
 import android.widget.TextView;
-import android.widget.Toast;
-
+import androidx.core.content.ContextCompat;
 import com.antsapps.triples.backend.Application;
 import com.antsapps.triples.backend.Card;
 import com.antsapps.triples.backend.ClassicGame;
+import com.antsapps.triples.backend.ClassicStatistics;
+import com.antsapps.triples.backend.DatePeriod;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.OnTimerTickListener;
-import com.google.android.gms.common.api.ResultCallback;
-import com.google.android.gms.games.Games;
-import com.google.android.gms.games.GamesStatusCodes;
-import com.google.android.gms.games.leaderboard.LeaderboardVariant;
-import com.google.android.gms.games.leaderboard.Leaderboards;
+import com.antsapps.triples.backend.Period;
+import com.google.android.gms.games.PlayGames;
 import com.google.common.collect.ImmutableList;
-
 import java.util.concurrent.TimeUnit;
 
 /** Classic Game */
@@ -48,6 +44,61 @@ public class ClassicGameActivity extends BaseGameActivity
     stub.inflate();
     mGame.addOnTimerTickListener(this);
     mGame.addOnUpdateCardsInPlayListener(this);
+  }
+
+  @Override
+  protected int getAccentColor() {
+    return ContextCompat.getColor(this, R.color.classic_accent);
+  }
+
+  @Override
+  protected String getCompletedStats() {
+    return formatClassicCompletedStats(mGame.getTimeElapsed());
+  }
+
+  @Override
+  protected void updatePerformanceDescriptionInternal(TextView performanceTv) {
+    Application app = Application.getInstance(this);
+    ClassicStatistics allTimeStats = app.getClassicStatistics(Period.ALL_TIME);
+    if (allTimeStats.getNumGames() <= 1) {
+      performanceTv.setText(R.string.performance_first_game);
+      return;
+    }
+
+    long currentTime = mGame.getTimeElapsed();
+    if (currentTime <= allTimeStats.getFastestTime()) {
+      performanceTv.setText(R.string.performance_classic_new_best);
+    } else if (currentTime
+        <= app.getClassicStatistics(DatePeriod.fromTimePeriod(TimeUnit.DAYS.toMillis(365)))
+            .getFastestTime()) {
+      performanceTv.setText(R.string.performance_classic_best_year);
+    } else if (currentTime
+        <= app.getClassicStatistics(DatePeriod.fromTimePeriod(TimeUnit.DAYS.toMillis(30)))
+            .getFastestTime()) {
+      performanceTv.setText(R.string.performance_classic_best_month);
+    } else if (currentTime
+        <= app.getClassicStatistics(DatePeriod.fromTimePeriod(TimeUnit.DAYS.toMillis(7)))
+            .getFastestTime()) {
+      performanceTv.setText(R.string.performance_classic_best_week);
+    } else if (currentTime
+        <= app.getClassicStatistics(DatePeriod.fromTimePeriod(TimeUnit.DAYS.toMillis(1)))
+            .getFastestTime()) {
+      performanceTv.setText(R.string.performance_classic_best_day);
+    } else if (currentTime < allTimeStats.getAverageTime()) {
+      performanceTv.setText(R.string.performance_classic_better_than_average);
+    } else {
+      performanceTv.setText(R.string.performance_classic_worse_than_average);
+    }
+  }
+
+  @Override
+  protected String getGameType() {
+    return "Classic";
+  }
+
+  @Override
+  protected void awardAchievements() {
+    AchievementManager.awardClassicAchievements(this, mGame.getTimeElapsed());
   }
 
   @Override
@@ -87,55 +138,12 @@ public class ClassicGameActivity extends BaseGameActivity
     numRemainingText.setText(String.valueOf(numRemaining));
   }
 
-  @Override
-  public void onCardHinted(Card hintedCard) {}
-
-  protected Class<? extends BaseGameListActivity> getParentClass() {
-    return ClassicGameListActivity.class;
-  }
-
   protected void submitScore() {
-    if (mGame.getGameState() == Game.GameState.COMPLETED) {
+    if (mGame.getGameState() != Game.GameState.COMPLETED || mGame.areHintsUsed()) {
       return;
     }
-    Games.Leaderboards.submitScoreImmediate(
-            mGoogleApiClient, GamesServices.Leaderboard.CLASSIC, mGame.getTimeElapsed())
-        .setResultCallback(
-            new ResultCallback<Leaderboards.SubmitScoreResult>() {
-              @Override
-              public void onResult(@NonNull Leaderboards.SubmitScoreResult submitScoreResult) {
-                String message = null;
-                switch (submitScoreResult.getStatus().getStatusCode()) {
-                  case GamesStatusCodes.STATUS_OK:
-                    if (submitScoreResult
-                        .getScoreData()
-                        .getScoreResult(LeaderboardVariant.TIME_SPAN_ALL_TIME)
-                        .newBest) {
-                      message = "Congratulations! That's your best score ever.";
-                    } else if (submitScoreResult
-                        .getScoreData()
-                        .getScoreResult(LeaderboardVariant.TIME_SPAN_WEEKLY)
-                        .newBest) {
-                      message = "Well Done! That's your best score this week.";
-                    } else if (submitScoreResult
-                        .getScoreData()
-                        .getScoreResult(LeaderboardVariant.TIME_SPAN_DAILY)
-                        .newBest) {
-                      message = "Nice! That's your best score today.";
-                    } else {
-                      message = "You've done better today - keep trying!";
-                    }
-                    break;
-                  case GamesStatusCodes.STATUS_NETWORK_ERROR_OPERATION_DEFERRED:
-                    message = "Score will be submitted when next connected.";
-                    break;
-                  default:
-                    message = "Score could not be submitted";
-                    break;
-                }
-                Toast.makeText(ClassicGameActivity.this, message, Toast.LENGTH_LONG).show();
-              }
-            });
+    PlayGames.getLeaderboardsClient(this)
+        .submitScore(getString(R.string.leaderboard_classic_game), mGame.getTimeElapsed());
   }
 
   @Override

@@ -12,13 +12,11 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.FrameLayout;
 import android.widget.TextView;
-
 import com.antsapps.triples.R;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.GameProperty;
 import com.antsapps.triples.backend.ReversableComparator;
 import com.google.common.collect.Maps;
-
 import java.util.Map;
 
 abstract class BaseStatisticsListHeaderView extends FrameLayout {
@@ -114,6 +112,11 @@ abstract class BaseStatisticsListHeaderView extends FrameLayout {
   void setOnComparatorChangeListener(OnComparatorChangeListener<Game> listener) {
     mComparatorChangeListener = listener;
     mComparatorChangeListener.onComparatorChange(mCurrentComparator);
+  }
+
+  protected void setAccentColor(int accentColor) {
+    ((TextView) findViewById(R.id.list_title)).setTextColor(accentColor);
+    findViewById(R.id.list_divider).setBackgroundColor(accentColor);
   }
 
   private void styleDrawable(ShapeDrawable dr) {

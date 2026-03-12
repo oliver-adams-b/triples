@@ -1,19 +1,15 @@
 package com.antsapps.triples;
 
-import android.app.AlertDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.os.Bundle;
 import android.os.Vibrator;
-import androidx.fragment.app.ListFragment;
-import android.view.View;
-import android.widget.AdapterView;
-import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.ArrayAdapter;
-
+import androidx.appcompat.app.AlertDialog;
+import androidx.fragment.app.ListFragment;
 import com.antsapps.triples.backend.Application;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.OnStateChangedListener;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 public abstract class BaseGameListFragment extends ListFragment implements OnStateChangedListener {
 
@@ -39,16 +35,10 @@ public abstract class BaseGameListFragment extends ListFragment implements OnSta
 
     getListView()
         .setOnItemLongClickListener(
-            new OnItemLongClickListener() {
-              @Override
-              public boolean onItemLongClick(
-                  AdapterView<?> parent, View view, final int position, long id) {
-                vibrator.vibrate(50);
-                AlertDialog alert =
-                    createDeleteAlertDialog((Game) parent.getItemAtPosition(position));
-                alert.show();
-                return true;
-              }
+            (parent, view, position, id) -> {
+              vibrator.vibrate(50);
+              createDeleteAlertDialog((Game) parent.getItemAtPosition(position)).show();
+              return true;
             });
   }
 
@@ -68,27 +58,16 @@ public abstract class BaseGameListFragment extends ListFragment implements OnSta
   protected abstract ArrayAdapter<Game> createArrayAdapter();
 
   private AlertDialog createDeleteAlertDialog(final Game game) {
-    AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+    MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(getActivity());
     builder.setCancelable(true);
     builder.setTitle(R.string.delete);
-    builder.setInverseBackgroundForced(true);
     builder.setPositiveButton(
         R.string.yes,
-        new DialogInterface.OnClickListener() {
-          @Override
-          public void onClick(DialogInterface dialog, int which) {
-            deleteGame(game);
-            dialog.dismiss();
-          }
+        (dialog, which) -> {
+          deleteGame(game);
+          dialog.dismiss();
         });
-    builder.setNegativeButton(
-        R.string.no,
-        new DialogInterface.OnClickListener() {
-          @Override
-          public void onClick(DialogInterface dialog, int which) {
-            dialog.dismiss();
-          }
-        });
+    builder.setNegativeButton(R.string.no, (dialog, which) -> dialog.dismiss());
     AlertDialog alert = builder.create();
     return alert;
   }

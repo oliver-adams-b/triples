@@ -1,0 +1,56 @@
+Triples Android App Setup Notes
+=================================
+
+Requirements:
+- Java 21 (Java 8/11/17 don't work cleanly with AGP 8.1+)
+- Gradle 8.8 (set in gradle/wrapper/gradle-wrapper.properties)
+- AGP 8.1.4 (8.0.0 has a D8 dexer bug with Java 17+ compiled classes)
+- Android SDK with platform-tools, platforms;android-33, build-tools;33.0.0
+
+What was broken / fixed:
+- gradle-wrapper.properties had gradle-8.1 which doesn't support Java 21 → bumped to 8.8
+- build.gradle had AGP 8.0.0 which has a D8 NPE bug with Java 21 → bumped to 8.1.4
+- build/intermediates had root-owned files → sudo chown -R $USER:$USER app/build
+- adb permissions: user needed plugdev group + udev rule for Google vendor ID (18d1)
+
+One-time Android SDK setup:
+----------------------------
+mkdir -p ~/android-sdk/cmdline-tools && cd ~/android-sdk/cmdline-tools
+wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+unzip cmdline-tools.zip && mv cmdline-tools latest && rm cmdline-tools.zip
+
+echo 'export ANDROID_HOME=$HOME/android-sdk' >> ~/.bashrc
+echo 'export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH' >> ~/.bashrc
+source ~/.bashrc
+
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH=$JAVA_HOME/bin:$PATH
+yes | sdkmanager --licenses
+sdkmanager "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+
+One-time ADB/USB setup (for Linux):
+-------------------------------------
+sudo usermod -aG plugdev $USER
+echo 'SUBSYSTEM=="usb", ATTR{idVendor}=="18d1", MODE="0666", GROUP="plugdev"' | sudo tee /etc/udev/rules.d/51-android.rules
+sudo chmod a+r /etc/udev/rules.d/51-android.rules
+sudo udevadm control --reload-rules && sudo udevadm trigger
+# Then unplug and replug phone, enable USB debugging on device
+
+On your phone:
+- Settings → About phone → tap Build number 7 times
+- Settings → Developer options → enable USB debugging
+- Accept the prompt on phone when plugging in
+
+Dev workflow:
+--------------
+# Build
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew assembleDebug
+
+# Install (first time)
+adb install app/build/outputs/apk/debug/app-debug.apk
+
+# Reinstall after changes (keeps app data)
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+
+# Verify phone is connected
+adb devices

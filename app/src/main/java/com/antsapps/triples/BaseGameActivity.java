@@ -2,40 +2,52 @@ package com.antsapps.triples;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
+import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.os.Handler;
 import android.preference.PreferenceManager;
-import androidx.appcompat.app.ActionBar;
+import android.text.format.DateUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.CheckBox;
+import android.widget.TextView;
 import android.widget.ViewAnimator;
-
+import androidx.appcompat.app.ActionBar;
+import com.antsapps.triples.backend.Application;
 import com.antsapps.triples.backend.Card;
 import com.antsapps.triples.backend.Game;
 import com.antsapps.triples.backend.Game.GameState;
+import com.antsapps.triples.backend.Game.OnUpdateCardsInPlayListener;
 import com.antsapps.triples.backend.Game.OnUpdateGameStateListener;
 import com.antsapps.triples.cardsview.CardsView;
+import com.antsapps.triples.stats.TimelineView;
+import com.antsapps.triples.util.AnalyticsUtil;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.play.core.review.ReviewInfo;
+import com.google.android.play.core.review.ReviewManager;
+import com.google.android.play.core.review.ReviewManagerFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.firebase.analytics.FirebaseAnalytics;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 public abstract class BaseGameActivity extends BaseTriplesActivity
-    implements OnUpdateGameStateListener, Game.OnUpdateCardsInPlayListener {
+    implements OnUpdateGameStateListener, OnUpdateCardsInPlayListener {
 
   public static final int VIEW_CARDS = 0;
   public static final int VIEW_PAUSED = 1;
   public static final int VIEW_COMPLETED = 2;
 
-  private static final long AUTO_RESTART_TIMEOUT_MS = -1; // unused, read from prefs
-
   private FirebaseAnalytics mFirebaseAnalytics;
 
   private ViewAnimator mViewAnimator;
-  private CardsView mCardsView;
+  protected CardsView mCardsView;
   private View mButtonBar;
   private GameState mGameState;
 
@@ -68,9 +80,26 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     GameState originalGameState = getGame().getGameState();
 
     mCardsView = (CardsView) findViewById(R.id.cards_view);
-    mCardsView.setOnValidTripleSelectedListener(getGame());
+    if (mCardsView.getOnValidTripleSelectedListener() == null) {
+      mCardsView.setOnValidTripleSelectedListener(getGame());
+    }
     mCardsView.setEnabled(originalGameState != GameState.COMPLETED);
     getGame().setGameRenderer(mCardsView);
+
+    mCardsView
+        .getViewTreeObserver()
+        .addOnGlobalLayoutListener(
+            new ViewTreeObserver.OnGlobalLayoutListener() {
+              @Override
+              public void onGlobalLayout() {
+                // Ensure width and height are greater than 0 before refreshing drawables
+                if (mCardsView.getWidth() > 0 && mCardsView.getHeight() > 0) {
+                  mCardsView.refreshDrawables();
+                  mCardsView.updateBounds();
+                  mCardsView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                }
+              }
+            });
 
     mViewAnimator = findViewById(R.id.view_switcher);
     mButtonBar = findViewById(R.id.button_bar);
@@ -80,16 +109,34 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     ActionBar actionBar = getSupportActionBar();
     actionBar.setDisplayHomeAsUpEnabled(true);
 
+    findViewById(R.id.bottom_separator).setBackgroundColor(getAccentColor());
+    ((TextView) findViewById(R.id.paused)).setTextColor(getAccentColor());
+    findViewById(R.id.rate_app).setBackgroundTintList(ColorStateList.valueOf(getAccentColor()));
+    findViewById(R.id.statistics_button)
+        .setBackgroundTintList(ColorStateList.valueOf(getAccentColor()));
+    findViewById(R.id.new_game_button)
+        .setBackgroundTintList(ColorStateList.valueOf(getAccentColor()));
+
+    mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
+
     getGame().begin();
 
     if (originalGameState == GameState.STARTING) {
       mCardsView.shouldSlideIn();
     }
-
-    mFirebaseAnalytics = FirebaseAnalytics.getInstance(this);
   }
 
   protected abstract Game getGame();
+
+  protected abstract int getAccentColor();
+
+  protected abstract String getCompletedStats();
+
+  protected abstract void updatePerformanceDescriptionInternal(TextView performanceTv);
+
+  protected abstract String getGameType();
+
+  protected abstract void awardAchievements();
 
   /**
    * This must initialize the game (so that getGame() doesn't return null) and set the content view
@@ -104,6 +151,12 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     super.onPrepareOptionsMenu(menu);
     menu.findItem(R.id.pause).setVisible(mGameState == GameState.ACTIVE);
     menu.findItem(R.id.play).setVisible(mGameState == GameState.PAUSED);
+    menu.findItem(R.id.shuffle).setVisible(mGameState == GameState.ACTIVE);
+
+    SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+    boolean hideHint = sharedPref.getBoolean(getString(R.string.pref_hide_hint), false);
+    menu.findItem(R.id.hint).setVisible(!hideHint);
+
     return true;
   }
 
@@ -119,13 +172,19 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     // Handle item selection
     int itemId = item.getItemId();
     if (itemId == R.id.hint) {
-      getGame().addHint();
+      handleHintSelection();
+      return true;
+    } else if (itemId == R.id.shuffle) {
+      getGame().shuffleCardsInPlay();
+      logGameEvent(AnalyticsConstants.Event.SHUFFLE_CARDS);
       return true;
     } else if (itemId == R.id.pause) {
       getGame().pause();
+      logGameEvent(AnalyticsConstants.Event.PAUSE_GAME);
       return true;
     } else if (itemId == R.id.play) {
       getGame().resume();
+      logGameEvent(AnalyticsConstants.Event.RESUME_GAME);
       return true;
     } else if (itemId == R.id.help) {
       Intent helpIntent = new Intent(getBaseContext(), HelpActivity.class);
@@ -135,17 +194,65 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
       Intent settingsIntent = new Intent(getBaseContext(), SettingsActivity.class);
       startActivity(settingsIntent);
       return true;
-    } else if (itemId == android.R.id.home) {// app icon in action bar clicked; go up one level
-      Intent intent = new Intent(this, getParentClass());
-      intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-      startActivity(intent);
+    } else if (itemId == android.R.id.home) { // app icon in action bar clicked; go up one level
       finish();
       return true;
     }
     return super.onOptionsItemSelected(item);
   }
 
-  protected abstract Class<? extends BaseGameListActivity> getParentClass();
+  @Override
+  public void animateFoundTriple(Set<Card> triple, boolean hintUsed) {
+    mCardsView.animateTripleFoundToOffscreen(triple);
+    logTripleFoundEvent(hintUsed);
+  }
+
+  protected void logTripleFoundEvent(boolean hintUsed) {
+    Bundle bundle = new Bundle();
+    bundle.putString(AnalyticsConstants.Param.GAME_TYPE, getGame().getGameTypeForAnalytics());
+    bundle.putBoolean(AnalyticsConstants.Param.HINT_USED, hintUsed);
+    mFirebaseAnalytics.logEvent(AnalyticsConstants.Event.FIND_TRIPLE, bundle);
+  }
+
+  private void handleHintSelection() {
+    final SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+    if (sharedPref.getBoolean(getString(R.string.pref_dont_ask_for_hint), false)) {
+      getGame().addHint();
+      logGameEvent(AnalyticsConstants.Event.USE_HINT);
+      updateHintUsedIndicator();
+    } else {
+      View checkBoxView = View.inflate(this, R.layout.remember_checkbox, null);
+      final CheckBox checkBox = (CheckBox) checkBoxView.findViewById(R.id.checkbox);
+      checkBox.setText(R.string.dont_ask_again);
+
+      MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this);
+      builder.setTitle(R.string.hint_confirmation_title);
+      builder.setMessage(R.string.hint_confirmation_message);
+      builder.setView(checkBoxView);
+      builder.setPositiveButton(
+          R.string.yes,
+          (dialog, which) -> {
+            if (checkBox.isChecked()) {
+              sharedPref
+                  .edit()
+                  .putBoolean(getString(R.string.pref_dont_ask_for_hint), true)
+                  .commit();
+            }
+            getGame().addHint();
+            logGameEvent(AnalyticsConstants.Event.USE_HINT);
+            updateHintUsedIndicator();
+          });
+      builder.setNegativeButton(R.string.no, (dialog, which) -> {});
+      builder.show();
+    }
+  }
+
+  private void updateHintUsedIndicator() {
+    View hintUsedIndicator = findViewById(R.id.hint_used_text);
+    if (hintUsedIndicator != null) {
+      hintUsedIndicator.setVisibility(getGame().areHintsUsed() ? View.VISIBLE : View.GONE);
+    }
+  }
 
   @Override
   protected void onResume() {
@@ -153,20 +260,15 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     resetAutoRestartTimer();
     getGame().resumeFromLifecycle();
 
+    updateHintUsedIndicator();
+
     SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
     if (sharedPref.getBoolean(getString(R.string.pref_screen_lock), true)) {
       getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
-    if (sharedPref.getBoolean(getString(R.string.pref_orientation_lock), false)) {
-      String orientation = sharedPref.getString(getString(R.string.pref_orientation), "portrait");
-      if (orientation.equals("portrait")) {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
-      } else if (orientation.equals("landscape")) {
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-      }
-    } else {
-      setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR);
+    if (mCardsView.getWidth() > 0 && mCardsView.getHeight() > 0) {
+      mCardsView.refreshDrawables();
     }
     updateViewSwitcher();
   }
@@ -209,6 +311,7 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     mGameState = state;
 
     updateViewSwitcher();
+    updateHintUsedIndicator();
 
     if (mGameState == GameState.COMPLETED) {
       mCardsView.setAlpha(0.5f);
@@ -231,9 +334,6 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     mLastNumTriplesFound = numTriplesFound;
   }
 
-  @Override
-  public void onCardHinted(Card card) {}
-
   private void resetAutoRestartTimer() {
     mAutoRestartHandler.removeCallbacks(mAutoRestartRunnable);
     SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
@@ -253,28 +353,29 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   public void gameFinished() {
     Log.i("BaseGameActivity", "game finished");
     updateViewSwitcher();
-    logGameFinished();
+    logGameEvent(AnalyticsConstants.Event.FINISH_GAME);
     if (isSignedIn()) {
       submitScore();
+      if (!getGame().areHintsUsed()) {
+        awardAchievements();
+      }
+      Application application = Application.getInstance(this);
+      AchievementManager.awardCountAchievements(this, application);
+      application.uploadToCloud(this);
     } else {
       shouldSubmitScoreOnSignIn = true;
     }
-  }
-
-  private void logGameFinished() {
-    Bundle bundle = new Bundle();
-    bundle.putString(AnalyticsConstants.Param.GAME_TYPE, getGame().getGameTypeForAnalytics());
-    mFirebaseAnalytics.logEvent(AnalyticsConstants.Event.FINISH_GAME, bundle);
   }
 
   protected abstract void submitScore();
 
   private void updateViewSwitcher() {
     int childToDisplay = VIEW_CARDS;
-    if (mGameState == GameState.PAUSED || !getGame().getActivityLifecycleActive()) {
-      childToDisplay = VIEW_PAUSED;
-    } else if (mGameState == GameState.COMPLETED) {
+    if (mGameState == GameState.COMPLETED) {
       childToDisplay = VIEW_COMPLETED;
+      updateStatistics();
+    } else if (mGameState == GameState.PAUSED || !getGame().getActivityLifecycleActive()) {
+      childToDisplay = VIEW_PAUSED;
     } else {
       childToDisplay = VIEW_CARDS;
     }
@@ -284,6 +385,80 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     if (mButtonBar != null) {
       mButtonBar.setVisibility(childToDisplay == VIEW_CARDS ? View.VISIBLE : View.GONE);
     }
+  }
+
+  protected static String formatElapsedTime(long elapsedMillis) {
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(elapsedMillis);
+    if (seconds < 3600) {
+      return String.format("%d:%02d", seconds / 60, seconds % 60);
+    } else {
+      return DateUtils.formatElapsedTime(seconds);
+    }
+  }
+
+  protected String formatClassicCompletedStats(long timeElapsed) {
+    long seconds = TimeUnit.MILLISECONDS.toSeconds(timeElapsed);
+    if (seconds < 60) {
+      return getString(R.string.classic_completed_stats_seconds_format, seconds);
+    } else {
+      return getString(R.string.classic_completed_stats_format, seconds / 60, seconds % 60);
+    }
+  }
+
+  private void updateStatistics() {
+    List<Long> findTimes = getGame().getTripleFindTimes();
+    if (!findTimes.isEmpty()) {
+      long fastest = Long.MAX_VALUE;
+      long slowest = 0;
+      int fastestIndex = -1;
+      int slowestIndex = -1;
+      long lastTime = 0;
+      for (int i = 0; i < findTimes.size(); i++) {
+        long time = findTimes.get(i);
+        long duration = time - lastTime;
+        if (duration < fastest) {
+          fastest = duration;
+          fastestIndex = i;
+        }
+        if (duration > slowest) {
+          slowest = duration;
+          slowestIndex = i;
+        }
+        lastTime = time;
+      }
+
+      TextView outputTv = (TextView) findViewById(R.id.game_output);
+      outputTv.setText(getCompletedStats());
+
+      TextView fastestTv = (TextView) findViewById(R.id.fastest_triple);
+      fastestTv.setText(formatElapsedTime(fastest));
+      fastestTv.setCompoundDrawablesWithIntrinsicBounds(R.drawable.green_dot, 0, 0, 0);
+      fastestTv.setCompoundDrawablePadding(
+          getResources().getDimensionPixelSize(R.dimen.triple_dot_padding));
+
+      TextView slowestTv = (TextView) findViewById(R.id.slowest_triple);
+      slowestTv.setText(formatElapsedTime(slowest));
+      slowestTv.setCompoundDrawablesWithIntrinsicBounds(R.drawable.red_dot, 0, 0, 0);
+      slowestTv.setCompoundDrawablePadding(
+          getResources().getDimensionPixelSize(R.dimen.triple_dot_padding));
+
+      TimelineView timelineView = (TimelineView) findViewById(R.id.timeline);
+      timelineView.setTripleFindTimes(
+          findTimes, getGame().getTimeElapsed(), fastestIndex, slowestIndex);
+
+      updatePerformanceDescription();
+    }
+  }
+
+  private void updatePerformanceDescription() {
+    TextView performanceTv = (TextView) findViewById(R.id.performance_description);
+    Game game = getGame();
+    if (game.areHintsUsed()) {
+      performanceTv.setText(R.string.performance_hints_used);
+      return;
+    }
+
+    updatePerformanceDescriptionInternal(performanceTv);
   }
 
   @Override
@@ -302,15 +477,37 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
 
   public void newGame(View view) {
     Intent newGameIntent = createNewGame();
-    logNewGame();
+    logGameEvent(AnalyticsConstants.Event.NEW_GAME);
     startActivity(newGameIntent);
+    finish();
   }
 
   protected abstract Intent createNewGame();
 
-  private void logNewGame() {
-    Bundle bundle = new Bundle();
-    bundle.putString(AnalyticsConstants.Param.GAME_TYPE, getGame().getGameTypeForAnalytics());
-    mFirebaseAnalytics.logEvent(AnalyticsConstants.Event.NEW_GAME, bundle);
+  public void showStatistics(View view) {
+    Intent intent = new Intent(this, StatisticsActivity.class);
+    intent.putExtra(StatisticsActivity.GAME_TYPE, getGameType());
+    startActivity(intent);
+  }
+
+  public void rateApp(View view) {
+    ReviewManager manager = ReviewManagerFactory.create(this);
+    manager
+        .requestReviewFlow()
+        .addOnCompleteListener(
+            task -> {
+              if (task.isSuccessful()) {
+                // We can get the ReviewInfo object
+                ReviewInfo reviewInfo = task.getResult();
+                manager.launchReviewFlow(this, reviewInfo);
+              } else {
+                // There was some problem, log or handle
+                Log.e("BaseGameActivity", "In-app review request failed", task.getException());
+              }
+            });
+  }
+
+  private void logGameEvent(String event) {
+    AnalyticsUtil.logGameEvent(mFirebaseAnalytics, event, getGame().getGameTypeForAnalytics());
   }
 }
