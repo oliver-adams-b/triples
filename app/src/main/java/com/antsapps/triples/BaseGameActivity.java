@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.os.Bundle;
+import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.text.format.DateUtils;
 import android.util.Log;
@@ -43,11 +44,30 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   public static final int VIEW_PAUSED = 1;
   public static final int VIEW_COMPLETED = 2;
 
+  private FirebaseAnalytics mFirebaseAnalytics;
+
   private ViewAnimator mViewAnimator;
   protected CardsView mCardsView;
+  private View mButtonBar;
   private GameState mGameState;
 
   private boolean shouldSubmitScoreOnSignIn = false;
+
+  private static final String TAG = "BaseGameActivity";
+  private final Handler mAutoRestartHandler = new Handler();
+  private boolean mAutoRestartPending = false;
+  private final Runnable mAutoRestartRunnable =
+      new Runnable() {
+        @Override
+        public void run() {
+          Log.d(TAG, "autoRestartRunnable fired, gameState=" + getGame().getGameState());
+          if (getGame().getGameState() == GameState.ACTIVE) {
+            mAutoRestartPending = true;
+            deleteCurrentGame();
+            newGame(null);
+          }
+        }
+      };
 
   /** Called when the activity is first created. */
   @Override
@@ -83,6 +103,9 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
             });
 
     mViewAnimator = findViewById(R.id.view_switcher);
+    mButtonBar = findViewById(R.id.button_bar);
+
+    getGame().addOnUpdateCardsInPlayListener(this);
 
     ActionBar actionBar = getSupportActionBar();
     actionBar.setDisplayHomeAsUpEnabled(true);
@@ -180,13 +203,6 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   }
 
   @Override
-  public void onUpdateCardsInPlay(
-      ImmutableList<Card> newCards,
-      ImmutableList<Card> oldCards,
-      int numRemaining,
-      int numTriplesFound) {}
-
-  @Override
   public void animateFoundTriple(Set<Card> triple, boolean hintUsed) {
     mCardsView.animateTripleFoundToOffscreen(triple);
     logTripleFoundEvent(hintUsed);
@@ -242,6 +258,7 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   @Override
   protected void onResume() {
     super.onResume();
+    resetAutoRestartTimer();
     getGame().resumeFromLifecycle();
 
     updateHintUsedIndicator();
@@ -260,13 +277,19 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   @Override
   protected void onPause() {
     super.onPause();
-    saveGame();
+    mAutoRestartHandler.removeCallbacks(mAutoRestartRunnable);
+    Log.d(TAG, "onPause: mAutoRestartPending=" + mAutoRestartPending);
+    if (!mAutoRestartPending) {
+      saveGame();
+    }
     getGame().pauseFromLifecycle();
     getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     updateViewSwitcher();
   }
 
   protected abstract void saveGame();
+
+  protected abstract void deleteCurrentGame();
 
   @Override
   protected void onSaveInstanceState(Bundle outState) {
@@ -276,6 +299,8 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
 
   @Override
   protected void onDestroy() {
+    mAutoRestartHandler.removeCallbacks(mAutoRestartRunnable);
+    getGame().removeOnUpdateCardsInPlayListener(this);
     getGame().setGameRenderer(null);
     getGame().removeOnUpdateGameStateListener(this);
 
@@ -291,9 +316,46 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
 
     if (mGameState == GameState.COMPLETED) {
       mCardsView.setAlpha(0.5f);
+      mAutoRestartHandler.removeCallbacks(mAutoRestartRunnable);
     }
 
     invalidateOptionsMenu();
+  }
+
+  private int mLastNumTriplesFound = -1;
+
+  @Override
+  public void onUpdateCardsInPlay(
+      ImmutableList<Card> newCards,
+      ImmutableList<Card> oldCards,
+      int numRemaining,
+      int numTriplesFound) {
+    Log.d(
+        TAG,
+        "onUpdateCardsInPlay: numTriplesFound="
+            + numTriplesFound
+            + " last="
+            + mLastNumTriplesFound);
+    if (numTriplesFound > mLastNumTriplesFound && mLastNumTriplesFound >= 0) {
+      Log.d(TAG, "triple found! resetting auto-restart timer");
+      resetAutoRestartTimer();
+    }
+    mLastNumTriplesFound = numTriplesFound;
+  }
+
+  private void resetAutoRestartTimer() {
+    mAutoRestartHandler.removeCallbacks(mAutoRestartRunnable);
+    SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+    boolean enabled = prefs.getBoolean(getString(R.string.pref_auto_restart_enabled), false);
+    if (enabled) {
+      int seconds = Math.max(10, prefs.getInt(getString(R.string.pref_auto_restart_timeout), 60));
+      Log.d(TAG, "resetAutoRestartTimer: scheduling restart in " + seconds + "s");
+      mAutoRestartHandler.postDelayed(mAutoRestartRunnable, seconds * 1000L);
+    }
+  }
+
+  public void shuffleCards(View view) {
+    getGame().shuffleCardsInPlay();
   }
 
   @Override
@@ -328,6 +390,9 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
     }
     if (mViewAnimator.getDisplayedChild() != childToDisplay) {
       mViewAnimator.setDisplayedChild(childToDisplay);
+    }
+    if (mButtonBar != null) {
+      mButtonBar.setVisibility(childToDisplay == VIEW_CARDS ? View.VISIBLE : View.GONE);
     }
   }
 

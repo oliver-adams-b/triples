@@ -64,6 +64,11 @@ public class ZenGameActivity extends BaseGameActivity {
   }
 
   @Override
+  protected void deleteCurrentGame() {
+    // Zen games are ephemeral, nothing to delete.
+  }
+
+  @Override
   protected void submitScore() {
     // Zen mode has no scores/leaderboards
   }

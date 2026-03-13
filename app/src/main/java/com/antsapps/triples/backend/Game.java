@@ -172,11 +172,6 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
     dispatchGameStateUpdate();
   }
 
-  public void shuffleCardsInPlay() {
-    Collections.shuffle(mCardsInPlay);
-    dispatchCardsInPlayUpdate(ImmutableList.copyOf(mCardsInPlay));
-  }
-
   public void resumeFromLifecycle() {
     mActivitiyLifecycleActive = true;
     updateTimer();
@@ -481,6 +476,15 @@ public abstract class Game implements Comparable<Game>, OnValidTripleSelectedLis
   }
 
   public abstract String getGameTypeForAnalytics();
+
+  public void shuffleCardsInPlay() {
+    if (mGameState != GameState.ACTIVE) return;
+    ImmutableList<Card> oldCards = ImmutableList.copyOf(mCardsInPlay);
+    mHintedCards.clear();
+    mGameRenderer.clearHintedCards();
+    Collections.shuffle(mCardsInPlay);
+    dispatchCardsInPlayUpdate(oldCards);
+  }
 
   public boolean addHint() {
     mHintsUsed = true;

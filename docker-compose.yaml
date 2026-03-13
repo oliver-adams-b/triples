@@ -1,0 +1,10 @@
+services:
+  triples:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+    ports:
+      - "80:80"
+    command: tail -f /dev/null

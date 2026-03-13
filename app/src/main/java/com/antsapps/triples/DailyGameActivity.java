@@ -105,6 +105,11 @@ public class DailyGameActivity extends BaseGameActivity
   }
 
   @Override
+  protected void deleteCurrentGame() {
+    // Daily games are not deleted on auto-restart.
+  }
+
+  @Override
   protected void onDestroy() {
     if (mGame != null) {
       mGame.removeOnUpdateCardsInPlayListener(this);

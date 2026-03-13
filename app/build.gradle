@@ -30,7 +30,6 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-project.txt'
         }
         debug {
-            signingConfig signingConfigs.release
         }
     }
     lintOptions {

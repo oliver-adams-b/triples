@@ -35,6 +35,24 @@
       app:updatesContinuously="true"
       android:title="@string/pref_animation_duration_title"/>
 
+  <androidx.preference.CheckBoxPreference
+      android:defaultValue="false"
+      android:key="@string/pref_auto_restart_enabled"
+      android:summaryOff="Game will not auto-restart"
+      android:summaryOn="Game will auto-restart if no set found in time"
+      android:title="Auto-Restart" />
+
+  <androidx.preference.SeekBarPreference
+      android:dependency="@string/pref_auto_restart_enabled"
+      android:defaultValue="60"
+      android:key="@string/pref_auto_restart_timeout"
+      android:min="10"
+      android:max="120"
+      app:seekBarIncrement="5"
+      app:adjustable="true"
+      app:showSeekBarValue="true"
+      android:title="Auto-Restart Timeout (seconds)"/>
+
   <androidx.preference.PreferenceCategory
       android:title="Card Customization">
 
