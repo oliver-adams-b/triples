@@ -131,7 +131,9 @@ public class ClassicGameActivity extends BaseGameActivity
 
   @Override
   public void onUpdateCardsInPlay(
-      ImmutableList<Card> newCards, ImmutableList<Card> oldCards, int numRemaining,
+      ImmutableList<Card> newCards,
+      ImmutableList<Card> oldCards,
+      int numRemaining,
       int numTriplesFound) {
     super.onUpdateCardsInPlay(newCards, oldCards, numRemaining, numTriplesFound);
     TextView numRemainingText = (TextView) findViewById(R.id.cards_remaining_text);

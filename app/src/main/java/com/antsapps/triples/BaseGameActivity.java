@@ -56,17 +56,18 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   private static final String TAG = "BaseGameActivity";
   private final Handler mAutoRestartHandler = new Handler();
   private boolean mAutoRestartPending = false;
-  private final Runnable mAutoRestartRunnable = new Runnable() {
-    @Override
-    public void run() {
-      Log.d(TAG, "autoRestartRunnable fired, gameState=" + getGame().getGameState());
-      if (getGame().getGameState() == GameState.ACTIVE) {
-        mAutoRestartPending = true;
-        deleteCurrentGame();
-        newGame(null);
-      }
-    }
-  };
+  private final Runnable mAutoRestartRunnable =
+      new Runnable() {
+        @Override
+        public void run() {
+          Log.d(TAG, "autoRestartRunnable fired, gameState=" + getGame().getGameState());
+          if (getGame().getGameState() == GameState.ACTIVE) {
+            mAutoRestartPending = true;
+            deleteCurrentGame();
+            newGame(null);
+          }
+        }
+      };
 
   /** Called when the activity is first created. */
   @Override
@@ -324,9 +325,17 @@ public abstract class BaseGameActivity extends BaseTriplesActivity
   private int mLastNumTriplesFound = -1;
 
   @Override
-  public void onUpdateCardsInPlay(ImmutableList<Card> newCards, ImmutableList<Card> oldCards,
-      int numRemaining, int numTriplesFound) {
-    Log.d(TAG, "onUpdateCardsInPlay: numTriplesFound=" + numTriplesFound + " last=" + mLastNumTriplesFound);
+  public void onUpdateCardsInPlay(
+      ImmutableList<Card> newCards,
+      ImmutableList<Card> oldCards,
+      int numRemaining,
+      int numTriplesFound) {
+    Log.d(
+        TAG,
+        "onUpdateCardsInPlay: numTriplesFound="
+            + numTriplesFound
+            + " last="
+            + mLastNumTriplesFound);
     if (numTriplesFound > mLastNumTriplesFound && mLastNumTriplesFound >= 0) {
       Log.d(TAG, "triple found! resetting auto-restart timer");
       resetAutoRestartTimer();
